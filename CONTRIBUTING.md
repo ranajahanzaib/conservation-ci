@@ -1,46 +1,9 @@
-## Contributing
+# Contributing
 
-We welcome contributions of all kinds to improve this project! Here's how you can get involved:
+Use current stable Rust, Node.js 22+, and pnpm. Build the workspace, install web dependencies with `pnpm --dir web install --frozen-lockfile`, and follow the README's development commands. Keep PLAN.md unchanged.
 
-1. **Fork the Repository**: Start by forking the repository to your GitHub account.
+Before submitting, run Rust formatting, warning-denied Clippy, all workspace tests, frontend typecheck/lint/tests, and the production build. Keep rustdoc and rustc from the same toolchain.
 
-2. **Clone Your Fork**: Clone the forked repository to your local machine:
+Changes to numerical calculations need independent known-value assertions and edge-case tests. Respect model applicability, SI units, signed spring orientation, zero-reference tolerance semantics, and deterministic report ordering. Do not infer causal defects from conservation evidence or add frontend copies of physics logic. New report fields need documentation; breaking changes require a schema version decision.
 
-   ```bash
-   git clone <repo_url>
-   cd repo_dir
-   ```
-
-3. **Create a Branch**: Create a new branch for your feature or bug fix:
-
-   ```bash
-   git checkout -b feature-name
-   ```
-
-4. **Make Changes**: Make your changes to the codebase. Be sure to follow existing code style and conventions.
-
-5. **Commit Changes**: Commit your changes with a clear and descriptive message:
-
-   ```bash
-   git commit -m "Add detailed description of the changes"
-   ```
-
-6. **Push Changes**: Push your changes to your fork:
-
-   ```bash
-   git push origin feature-name
-   ```
-
-7. **Submit a Pull Request**: Open a pull request from your branch to the main repository's branch. Include a detailed description of your changes and the problem they solve.
-
-8. **Review and Feedback**: Participate in the review process. Make any requested changes, and your contribution will be merged!
-
-### Guidelines
-
-- Ensure your code follows the existing style and conventions.
-- Include tests for any new functionality or bug fixes.
-- Write clear, concise commit messages and pull request descriptions.
-
-### Issues
-
-Feel free to report bugs or suggest enhancements by creating an issue. Be sure to include detailed information about the problem and, if possible, steps to reproduce it.
+Keep dependencies restrained. Do not commit target, node_modules, dist, transient reports, credentials, or large datasets. Generate proposed fixture changes into a new directory and review their effects on all checks. Include the trigger, expected/actual behavior, and exact commands/results in a pull request. The project follows CODE_OF_CONDUCT.md and uses the MIT license.
