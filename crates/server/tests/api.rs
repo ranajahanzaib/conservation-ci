@@ -94,3 +94,10 @@ async fn request_size_limit() {
     .await;
     assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE);
 }
+
+#[tokio::test]
+async fn static_assets_bypass_rate_limiter() {
+    // When 2 API requests occupy the semaphore, static assets should still be served.
+    let (status, _) = call("/index.html", None).await;
+    assert_eq!(status, StatusCode::OK);
+}

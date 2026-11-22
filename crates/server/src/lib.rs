@@ -160,22 +160,17 @@ async fn export(
 }
 pub fn app(web: &std::path::Path) -> Router {
     let semaphore = std::sync::Arc::new(tokio::sync::Semaphore::new(2));
-    Router::new()
+    let api_routes = Router::new()
         .route(
-            "/api/health",
+            "/health",
             get(|| async { Json(serde_json::json!({"status":"ok"})) }),
         )
-        .route("/api/examples", get(|| async { Json(fixtures::IDS) }))
-        .route("/api/examples/{id}", get(example))
-        .route("/api/analyze", post(analyze_request))
-        .route("/api/samples/{index}", post(sample))
-        .route("/api/validate", post(validate))
-        .route("/api/reports/{format}", post(export))
-        .layer(DefaultBodyLimit::max(MAX_BYTES + 1024 * 1024))
-        .layer(tower_http::limit::RequestBodyLimitLayer::new(
-            MAX_BYTES + 1024 * 1024,
-        ))
-        .fallback_service(tower_http::services::ServeDir::new(web))
+        .route("/examples", get(|| async { Json(fixtures::IDS) }))
+        .route("/examples/{id}", get(example))
+        .route("/analyze", post(analyze_request))
+        .route("/samples/{index}", post(sample))
+        .route("/validate", post(validate))
+        .route("/reports/{format}", post(export))
         .layer(axum::middleware::from_fn(
             move |req: axum::extract::Request, next: axum::middleware::Next| {
                 let semaphore = semaphore.clone();
@@ -192,7 +187,15 @@ pub fn app(web: &std::path::Path) -> Router {
                     next.run(req).await
                 }
             },
+        ));
+
+    Router::new()
+        .nest("/api", api_routes)
+        .layer(DefaultBodyLimit::max(MAX_BYTES + 1024 * 1024))
+        .layer(tower_http::limit::RequestBodyLimitLayer::new(
+            MAX_BYTES + 1024 * 1024,
         ))
+        .fallback_service(tower_http::services::ServeDir::new(web))
 }
 pub async fn serve(port: u16, web: std::path::PathBuf) -> std::io::Result<()> {
     let _ = tracing_subscriber::fmt().try_init();
