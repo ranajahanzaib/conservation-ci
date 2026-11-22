@@ -97,7 +97,17 @@ async fn request_size_limit() {
 
 #[tokio::test]
 async fn static_assets_bypass_rate_limiter() {
-    // When 2 API requests occupy the semaphore, static assets should still be served.
-    let (status, _) = call("/index.html", None).await;
-    assert_eq!(status, StatusCode::OK);
+    let tmp_dir = std::env::temp_dir().join(format!("conservationci_test_{}", std::process::id()));
+    std::fs::create_dir_all(&tmp_dir).unwrap();
+    let index_file = tmp_dir.join("index.html");
+    std::fs::write(&index_file, "<html>test</html>").unwrap();
+    let app = conservationci_server::app(&tmp_dir);
+    let req = Request::builder()
+        .uri("/index.html")
+        .body(Body::empty())
+        .unwrap();
+    let r = app.oneshot(req).await.unwrap();
+    let _ = std::fs::remove_file(&index_file);
+    let _ = std::fs::remove_dir(&tmp_dir);
+    assert_eq!(r.status(), StatusCode::OK);
 }
