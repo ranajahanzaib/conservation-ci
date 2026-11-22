@@ -2,19 +2,54 @@
 
 **Catch broken physics before it ships.**
 
-ConservationCI independently audits exported simulation trajectories against model-specific conservation expectations, configured tolerances, and traceable evidence. It includes a Rust engine and CLI, a local HTTP API, and a React dashboard.
+ConservationCI independently audits exported simulation trajectories against model-specific conservation expectations, configured tolerances, and traceable evidence. It includes a high-performance Rust engine and CLI, a local HTTP API, and an interactive React dashboard.
 
-**GitHub repository description:** Audit physics simulation trajectories against declared conservation laws. Local Rust CLI, API, and React dashboard with CI-ready reports.
-
-**Suggested GitHub topics:** `physics`, `computational-physics`, `scientific-computing`, `simulation`, `conservation-laws`, `rust`, `continuous-integration`, `trajectory-analysis`
-
-ConservationCI audits exported physics trajectories against the invariants justified by a declared physical model. It provides a reusable Rust engine, standalone CLI, localhost HTTP API, and React diagnostic dashboard. No accounts, databases, external datasets, or network services are needed after installation.
+![ConservationCI Dashboard Overview](docs/screenshots/overview.png)
 
 ## What it catches
 
-An exported trajectory can look plausible while its energy grows or its total momentum jumps. ConservationCI evaluates **every sample**, identifies the first threshold crossing and source CSV row, and exports reproducible evidence for debugging and CI. It does not integrate your trajectory or identify a simulator's root cause.
+An exported trajectory can look plausible while its total energy drifts or its momentum violates conservation laws. ConservationCI evaluates **every sample**, pinpoints the first threshold crossing and exact source CSV row, and exports reproducible evidence for debugging and automated CI checks.
 
-Try the built-in analytic, Euler, Verlet, corruption, damping, and driven examples in the dashboard. The energy-only and momentum-only corruptions occur at **t=5 s, source row 252**. The analytic reference begins with **0.15 J** and **0.2 kg m/s**. These values are independently tested.
+Try the built-in analytic, Euler, Verlet, corruption, damping, and driven examples in the dashboard. The energy-only and momentum-only corruptions occur at **t=5 s, source row 252**. The analytic reference begins with **0.15 J** and **0.2 kg m/s**. These values are independently verified.
+
+## Interface Showcase
+
+### Interactive Diagnostic Dashboard
+
+The local React dashboard provides interactive analysis, phase space trajectories, threshold visualization, and physical scrubbing.
+
+|                                                    Primary Overview                                                    |                                                        Energy Violation (Euler)                                                        |
+| :--------------------------------------------------------------------------------------------------------------------: | :------------------------------------------------------------------------------------------------------------------------------------: |
+| ![Analytic Reference](docs/screenshots/overview.png)<br><sub>Exact harmonic solution passing conservation checks</sub> | ![Euler Drift](docs/screenshots/energy-failure-euler.png)<br><sub>Accumulating numerical energy drift flagged with exact CSV row</sub> |
+
+|                                                     Momentum Analysis                                                     |                                                  Phase Space Orbit                                                   |
+| :-----------------------------------------------------------------------------------------------------------------------: | :------------------------------------------------------------------------------------------------------------------: |
+| ![Momentum Analysis](docs/screenshots/momentum-analysis.png)<br><sub>Independent momentum conservation verification</sub> | ![Phase Space](docs/screenshots/phase-space.png)<br><sub>Phase space trajectories ($v$ vs $x$) for both bodies</sub> |
+
+|                                                  Model Configuration Drawer                                                  |                                              Initial / Empty State                                              |
+| :--------------------------------------------------------------------------------------------------------------------------: | :-------------------------------------------------------------------------------------------------------------: |
+| ![Model Configuration](docs/screenshots/model-configuration.png)<br><sub>Live TOML parameter and column mapping editor</sub> | ![Initial State](docs/screenshots/initial-state.png)<br><sub>Clean zero-network initial landing workspace</sub> |
+
+### Terminal CLI & CI Integration
+
+ConservationCI's standalone CLI outputs structured markdown reports and GitHub Actions workflow annotations:
+
+![CLI Terminal Verification](docs/screenshots/cli-check-failure.png)
+
+```bash
+# Pass: exit 0
+conservationci check \
+  --input examples/fixtures/analytic.csv \
+  --config examples/models/conservative.toml
+
+# Energy failure: exit 1 (emits GitHub annotation)
+conservationci check \
+  --input examples/fixtures/euler.csv \
+  --config examples/models/conservative.toml \
+  --report-json /tmp/report.json \
+  --report-md /tmp/report.md \
+  --github-annotations
+```
 
 ## Supported physical model
 
@@ -28,10 +63,10 @@ E = K + U
 P = m1*v1 + m2*v2
 ```
 
-This is a signed-displacement spring, not an absolute-distance or collision model. A fixed-wall oscillator is different: the wall supplies an external force, so the moving mass alone generally does not conserve momentum. See [the derivation](docs/physics.md).
+This is a signed-displacement spring, not an absolute-distance or collision model. A fixed-wall oscillator is different: the wall supplies an external force, so the moving mass alone generally does not conserve momentum. See [the physics derivation](docs/physics.md).
 
 | Declared regime        | Mechanical energy                                                 | Total momentum     |
-| ---------------------- | ----------------------------------------------------------------- | ------------------ |
+| :--------------------- | :---------------------------------------------------------------- | :----------------- |
 | `closed_conservative`  | Conservation check                                                | Conservation check |
 | `internal_dissipation` | Conservation not applicable; optional adjacent non-increase check | Conservation check |
 | `externally_driven`    | Diagnostic only                                                   | Diagnostic only    |
@@ -40,7 +75,7 @@ Enabling a check never overrides regime applicability. Passive internal dissipat
 
 ## Installation
 
-Requires current stable Rust (edition 2024), Node.js 22+, and pnpm 12.3.4 (pinned in `web/package.json`). Run from the repository root:
+Requires stable Rust (edition 2024), Node.js 22+, and pnpm 12.3.4 (pinned in `web/package.json`). Run from the repository root:
 
 ```bash
 cargo build --release --locked
@@ -48,11 +83,11 @@ pnpm --dir web install --frozen-lockfile
 pnpm --dir web run build
 ```
 
-The executable is `target/release/conservationci`. Optionally install it with `cargo install --path crates/cli --locked`. The dashboard assets remain in `web/dist`; pass `--web /absolute/path/to/web/dist` when launching elsewhere. The standalone CLI needs no frontend build or server.
+The compiled release binary is located at `target/release/conservationci`. Optionally install it with `cargo install --path crates/cli --locked`. The dashboard assets reside in `web/dist`; pass `--web /path/to/web/dist` when running the server from an arbitrary directory. The standalone CLI needs no frontend build or server.
 
 ## CLI quick start
 
-Fixtures are already included. Generate a new copy without overwriting them:
+Pre-generated fixtures are included under `examples/fixtures/`. Generate a fresh copy without overwriting existing files:
 
 ```bash
 cargo run -p conservationci-cli -- fixtures generate --output /tmp/conservationci-fixtures
@@ -77,14 +112,16 @@ cargo run -p conservationci-cli -- validate \
   --config examples/models/conservative.toml
 ```
 
-`fixtures generate` without `--output` targets `examples/fixtures`. Existing files cause an error; it never overwrites them. Use a new directory for each generation. `--help` and `--version` are available.
+`fixtures generate` without `--output` targets `examples/fixtures`. Existing files trigger an error; it never overwrites them.
 
-| Exit | Meaning                                                                           |
-| ---- | --------------------------------------------------------------------------------- |
-| 0    | All applicable checks passed, or valid `UNVERIFIED` run with no applicable checks |
-| 1    | At least one enabled physical check failed                                        |
-| 2    | Invalid input/configuration or missing input file                                 |
-| 3    | Execution failure, including report write or server errors                        |
+### CLI Exit Codes
+
+| Exit Code | Meaning                                                                           |
+| :-------: | :-------------------------------------------------------------------------------- |
+|   **0**   | All applicable checks passed, or valid `UNVERIFIED` run with no applicable checks |
+|   **1**   | At least one enabled physical check failed                                        |
+|   **2**   | Invalid input/configuration or missing input file                                 |
+|   **3**   | Execution failure, including report write or server errors                        |
 
 A zero exit code for `UNVERIFIED` is an operational policy, not scientific verification. JSON and Markdown reports are written even for physical failures. Validation errors appear as JSON on stderr.
 
@@ -96,9 +133,17 @@ After building the frontend:
 cargo run -p conservationci-cli -- serve --port 8787
 ```
 
-Open [the local dashboard](http://127.0.0.1:8787). Choose a real bundled fixture, or import/drop a CSV, edit its TOML, map columns, and run analysis. Inspect energy, momentum, phase space, tolerance boundaries, source samples, and failure evidence. Play/scrub the imported positions; reduced-motion preferences disable playback. Downloads come from the Rust backend and retain the analyzed input even if the editor changes afterward.
+Open [http://127.0.0.1:8787](http://127.0.0.1:8787) in your browser. Choose a bundled fixture or import your own CSV, edit the TOML config, map column names, and run analysis. Inspect energy, momentum, phase space, tolerance boundaries, source samples, and failure evidence.
 
-For frontend development, run the Rust server in one terminal and `pnpm --dir web run dev` in another. Vite proxies `/api` to port 8787. The API always binds `127.0.0.1`, with no permissive CORS or browser-controlled filesystem paths.
+For frontend development with hot reloading:
+
+```bash
+# Terminal 1: backend server
+cargo run -p conservationci-cli -- serve --port 8787
+
+# Terminal 2: Vite dev server with proxy
+pnpm --dir web run dev
+```
 
 ## CSV schema
 
@@ -107,90 +152,86 @@ t,x1,v1,x2,v2
 0,0,0.4,1.2,-0.1
 ```
 
-This excerpt is just one initial state; analysis needs at least two samples. SI units: t in seconds; positions in meters; velocities in m/s; masses in kg; k in N/m; energy in J; momentum in kg m/s. Time must be finite and strictly increasing; irregular intervals are supported. Invalid rows are rejected, never discarded, reordered, or repaired. Extra columns are reported as ignored. Default limits: **32 MiB**, **250,000 samples**. Source rows are physical CSV start lines, including for quoted multiline records. See [CSV format](docs/csv-format.md).
+SI units: time $t$ in seconds; positions $x_i$ in meters; velocities $v_i$ in m/s; masses in kg; $k$ in N/m; energy in J; momentum in kg m/s. Time must be finite and strictly increasing; irregular intervals are supported. Invalid rows are rejected, never silently repaired or reordered. Extra columns are ignored and reported. Limits: **32 MiB**, **250,000 samples**. Source rows map to physical CSV start lines. See [CSV format specification](docs/csv-format.md).
 
 ## TOML model and tolerances
 
-Use [conservative.toml](examples/models/conservative.toml) as a starting point:
+Use [examples/models/conservative.toml](examples/models/conservative.toml) as a starting point:
 
 ```toml
 schema_version = 1
 model = "two_mass_spring_1d"
 regime = "closed_conservative"
 units = "SI"
+
 [masses]
 m1 = 1.0
 m2 = 2.0
+
 [spring]
 stiffness = 3.0
 rest_length = 1.0
+
 [checks.energy]
 absolute_tolerance = 0.000001
 relative_tolerance = 0.01
+
 [checks.momentum]
 absolute_tolerance = 0.00000001
 relative_tolerance = 0.000001
 ```
 
-The initial sampled quantity Q₀ is the reference. A violation means:
+The initial sampled quantity $Q_0$ is the reference. A violation occurs when:
 
-```text
-abs(Qᵢ − Q₀) > absolute_tolerance + relative_tolerance * abs(Q₀)
-```
+$$\left| Q_i - Q_0 \right| > \text{absolute\_tolerance} + \text{relative\_tolerance} \times \left| Q_0 \right|$$
 
-Equality passes. An optional positive `reference_scale` changes the relative scale to `max(abs(Q₀), reference_scale)`. No universal dimensionful scale is inserted. At zero reference, absolute tolerance works normally. With zero allowed error, a nonzero error fails; its normalized ratio is null with an explicit `zero_tolerance_exceeded` flag.
+Equality passes. An optional positive `reference_scale` adjusts the relative scale to $\max(|Q_0|, \text{reference\_scale})$. See [Configuration reference](docs/configuration.md).
 
-These defaults are illustrative, not universal accuracy guarantees. Choose tolerances for your model, units, integrator, and export precision. Monotonicity compares adjacent energies using a local tolerance based on the preceding energy; it is not energy conservation. [Configuration reference](docs/configuration.md).
+## Testing and Verification
 
-## Generated examples
-
-All seven deterministic Rust-generated fixture families, their numerical methods, parameters, and expectations are documented in [examples/README.md](examples/README.md). The API embeds the actual checked-in CSV/TOML files; no browser simulation or fabricated result is used.
-
-## GitHub Actions
-
-[The repository workflow](.github/workflows/ci.yml) builds, checks formatting and Clippy, tests Rust and React, generates fresh fixtures, runs the CLI with annotations, and uploads reports even on failure. Use `check` directly in your simulation's workflow; its exit code fails the job. See [CI integration](docs/ci-integration.md) for a copyable example.
-
-## Reports
-
-Versioned JSON includes tool version, input SHA-256, canonical parsed-config SHA-256, regime, applicability, configured tolerances, summary metrics, source locations, and deterministic explanations. No generation timestamp enters the canonical report. JSON keeps at most 1,000 violation events while retaining full counts; the full-sample CSV includes every analyzed sample. [Report schema](docs/report-schema.md).
-
-Diagnostics include first crossing, peak/time, final signed error, RMS, first/last 20% RMS, signed OLS slope, and longest consecutive violation streak. They describe error behavior without automatically identifying an integrator, declaring monotonic drift, or assigning a root cause.
-
-## Testing
+Run the full end-to-end verification suite across both Rust crates and the React web application:
 
 ```bash
+./scripts/verify.sh
+```
+
+Or execute individual test suites:
+
+```bash
+# Rust engine, CLI, and API tests
 cargo fmt --all --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
+
+# React web application verification
 pnpm --dir web run typecheck
 pnpm --dir web run lint
 pnpm --dir web test
 pnpm --dir web run build
 ```
 
-Run all checks with `./scripts/verify.sh`.
-
-Rust tests cover independent known-value physics assertions, every fixture family, tolerances, invalid input, deterministic reports, 100,000 samples, subprocess exit codes, exports, and API/core equivalence. Frontend interaction tests use a mocked API and chart renderer; real charts should also be exercised in a browser. Keep rustc and rustdoc from the same stable toolchain if your PATH includes multiple installations.
+The Rust tests cover independent known-value physics assertions, all fixture families, tolerances, invalid inputs, deterministic reports, 100,000-sample loads, subprocess exit codes, exports, and API/core equivalence.
 
 ## Architecture
 
-`crates/core` owns validation, physics, fixtures, analysis, presentation reduction, and reports. `crates/cli` owns commands and exit policy. `crates/server` adapts the same engine to a bounded, stateless Axum API and serves the frontend. `web` renders backend results with React, TypeScript, Recharts, and original SVG. [Architecture and API](docs/architecture.md).
+- **`crates/core`**: Implements validation, physics derivation, fixture generation, numerical analysis, downsampling reduction, and reports.
+- **`crates/cli`**: Command-line interface, process argument parsing, and exit contract handling.
+- **`crates/server`**: Stateless Axum HTTP API binding strictly to `127.0.0.1`, hosting both API endpoints and the built frontend.
+- **`web`**: React 19 + TypeScript dashboard using Recharts for high-density physical trajectory and phase space plotting.
 
-Analysis uses bounded O(n) memory. Charts use bucket extrema and the first 1,000 threshold boundaries; the full analysis is never reduced. Dense crossing evidence is available in full CSV exports; charts can omit later crossings. The visible event list shows the first 100 events; selecting an event requests its exact original sample. Playback traverses plotted samples and is an inspection aid, not real-time simulation playback.
+See [Architecture documentation](docs/architecture.md).
 
 ## Scientific limitations
 
-- Conservation does not prove overall physical correctness, and violations do not uniquely identify a bug.
+- Conservation within tolerance does not prove overall physical correctness, and violations do not uniquely pinpoint a simulator bug.
 - Findings depend on declared model assumptions, adequate exported state, SI units, and chosen tolerances.
-- Different integration methods have different finite-step errors. Bounded energy error is not exact conservation.
-- f64 and CSV export precision limit accuracy; extreme arithmetic ranges are rejected.
-- Export sampling may miss violations between samples.
-- The first exported state is a reference, not independently verified ground truth.
-- Dissipation needs different expectations; external driving needs work/impulse accounting for balance-law checks, which this version does not support.
-- The oriented spring model has no collisions or absolute-distance behavior. Only this one model is implemented.
-- The analyzer does not verify equations of motion and cannot replace model validation.
-- Cross-platform transcendental rounding in fixture generation can differ at the last bits; checked-in fixture bytes provide a shared oracle. Reports are deterministic for identical bytes, config, and build/platform.
+- Different integration methods feature different finite-step errors. Bounded energy oscillation is not exact conservation.
+- $f64$ and CSV export precision limit accuracy; extreme arithmetic ranges are rejected.
+- Export sampling may miss violations between recorded samples.
+- The first exported state is a reference, not an independently verified ground truth.
+- Dissipation requires non-increase checks; external driving requires work/impulse accounting.
+- Only the 1D two-mass oriented spring model is implemented.
 
-## Contributing and license
+## Contributing and License
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). MIT licensed; see [LICENSE](LICENSE).
+See [CONTRIBUTING.md](CONTRIBUTING.md). Released under the [MIT License](LICENSE).
